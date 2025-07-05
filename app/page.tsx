@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { useMemo } from "react";
+
 interface Transaction {
   _id?: string;
   amount: number;
@@ -23,6 +25,41 @@ export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [form, setForm] = useState<Transaction>({ amount: 0, description: "", date: "", category: "Other" });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [budgets, setBudgets] = useState<{ category: string; amount: number; month: string }[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
+  const [newBudget, setNewBudget] = useState<{ category: string; amount: number }>({ category: "Food", amount: 0 });
+
+
+  useEffect(() => {
+    fetchBudgets();
+  }, [selectedMonth]);
+
+  async function fetchBudgets() {
+    const res = await fetch("/api/budgets");
+    const data = await res.json();
+    setBudgets(data.filter((b: any) => b.month === selectedMonth));
+  }
+
+  async function handleBudgetSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await fetch("/api/budgets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...newBudget, month: selectedMonth }),
+    });
+    setNewBudget({ category: "Food", amount: 0 });
+    fetchBudgets();
+  }
+
+  const actuals = useMemo(() => {
+    return CATEGORIES.map((cat) => {
+      const totalSpent = transactions
+        .filter((tx) => tx.category === cat && tx.date.startsWith(selectedMonth))
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      const budget = budgets.find((b) => b.category === cat)?.amount || 0;
+      return { category: cat, budget, actual: totalSpent };
+    });
+  }, [budgets, transactions, selectedMonth]);
 
   useEffect(() => {
     fetchTransactions();
@@ -176,6 +213,67 @@ export default function Home() {
           <h2 className="font-semibold text-lg">Total Expenses: ₹{totalExpenses}</h2>
         </CardContent>
       </Card>
+
+  <Card>
+    <CardContent className="p-4 space-y-4">
+      <h2 className="font-semibold text-lg">Set Monthly Budgets</h2>
+      <form onSubmit={handleBudgetSubmit} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <Select value={newBudget.category} onValueChange={(val) => setNewBudget({ ...newBudget, category: val })}>
+          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+          <SelectContent>
+            {CATEGORIES.map((cat) => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          type="number"
+          placeholder="Budget amount"
+          value={newBudget.amount}
+          onChange={(e) => setNewBudget({ ...newBudget, amount: +e.target.value })}
+        />
+        <Input
+          type="month"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+        />
+        <Button type="submit">Save</Button>
+      </form>
+    </CardContent>
+  </Card>
+
+  <Card>
+    <CardContent className="p-4">
+      <h2 className="font-semibold text-lg mb-2">Budget vs Actual</h2>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={actuals}>
+          <XAxis dataKey="category" />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="budget" fill="#4ade80" name="Budget" />
+          <Bar dataKey="actual" fill="#f87171" name="Actual" />
+        </BarChart>
+      </ResponsiveContainer>
+    </CardContent>
+  </Card>
+  {actuals.some(a => a.budget > 0 && a.actual > a.budget) && (
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-semibold text-lg mb-2 text-red-600">⚠ Over Budget Warnings</h2>
+          <ul className="list-disc pl-5 space-y-1">
+            {actuals.map((entry) => (
+              entry.budget > 0 && entry.actual > entry.budget && (
+                <li key={entry.category}>
+                  <span className="text-red-500 font-medium">{entry.category}</span>: Over by ₹{entry.actual - entry.budget}
+                </li>
+              )
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    )}
     </main>
   );
 }
+
+
