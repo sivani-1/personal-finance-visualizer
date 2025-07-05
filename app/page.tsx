@@ -1,28 +1,21 @@
-
-"use client";
-
+"use client"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface Transaction {
   _id?: string;
   amount: number;
   description: string;
   date: string;
-  category: string;
 }
-
-const CATEGORIES = ["Food", "Rent", "Transport", "Shopping", "Utilities", "Other"];
-const COLORS = ["#f87171", "#fb923c", "#facc15", "#34d399", "#60a5fa", "#a78bfa"];
 
 export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [form, setForm] = useState<Transaction>({ amount: 0, description: "", date: "", category: "Other" });
+  const [form, setForm] = useState<Transaction>({ amount: 0, description: "", date: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +30,7 @@ export default function Home() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.description || !form.amount || !form.date || !form.category) return alert("Fill all fields");
+    if (!form.description || !form.amount || !form.date) return alert("Fill all fields");
     const method = editingId ? "PUT" : "POST";
     const url = editingId ? `/api/transactions/${editingId}` : "/api/transactions";
     await fetch(url, {
@@ -45,7 +38,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    setForm({ amount: 0, description: "", date: "", category: "Other" });
+    setForm({ amount: 0, description: "", date: "" });
     setEditingId(null);
     fetchTransactions();
   }
@@ -56,7 +49,7 @@ export default function Home() {
   }
 
   async function handleEdit(tx: Transaction) {
-    setForm({ amount: tx.amount, description: tx.description, date: tx.date.split("T")[0], category: tx.category });
+    setForm({ amount: tx.amount, description: tx.description, date: tx.date.split("T")[0] });
     setEditingId(tx._id!);
   }
 
@@ -69,18 +62,11 @@ export default function Home() {
     }, {} as Record<string, { month: string; total: number }>)
   );
 
-  const categoryData = CATEGORIES.map((cat, index) => {
-    const total = transactions.filter((tx) => tx.category === cat).reduce((sum, tx) => sum + tx.amount, 0);
-    return { name: cat, value: total, fill: COLORS[index] };
-  });
-
-  const totalExpenses = transactions.reduce((sum, tx) => sum + tx.amount, 0);
-
   return (
-    <main className="p-4 max-w-4xl mx-auto space-y-6">
+    <main className="p-4 max-w-3xl mx-auto space-y-6">
       <Card>
         <CardContent className="p-4">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Input
               type="number"
               placeholder="Amount"
@@ -101,17 +87,7 @@ export default function Home() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               required
             />
-            <Select value={form.category} onValueChange={(val) => setForm({ ...form, category: val })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="submit" className="sm:col-span-4">
+            <Button type="submit" className="sm:col-span-3">
               {editingId ? "Update" : "Add"} Transaction
             </Button>
           </form>
@@ -124,7 +100,7 @@ export default function Home() {
           {transactions.map((tx) => (
             <div key={tx._id} className="flex justify-between items-center border-b py-2">
               <div>
-                <p className="font-medium">{tx.description} ({tx.category})</p>
+                <p className="font-medium">{tx.description}</p>
                 <p className="text-sm text-muted-foreground">
                   {format(new Date(tx.date), "yyyy-MM-dd")} - ₹{tx.amount}
                 </p>
@@ -140,41 +116,17 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <h2 className="font-semibold text-lg mb-2">Monthly Expenses</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="total" fill="#6366f1" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <h2 className="font-semibold text-lg mb-2">Category Breakdown</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardContent className="p-4">
-          <h2 className="font-semibold text-lg">Total Expenses: ₹{totalExpenses}</h2>
+          <h2 className="font-semibold text-lg mb-2">Monthly Expenses</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={monthlyData}>
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="total" fill="#6366f1" />
+            </BarChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </main>
